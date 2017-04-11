@@ -1,0 +1,124 @@
+#!/bin/bash
+# AFEWMORE script
+
+PROGNAME=$(basename $0)
+VERSION='0.0.1'
+
+function usage
+{
+	#####
+	#	Function to display usage message (does not exit)
+	#	No arguments
+	#####
+
+	echo "Usage: ${PROGNAME} [-hv] [-d dir] [-n num] instance"
+}
+
+function helptext
+{
+	#####
+	#   Function to display help message for program
+	#   No arguments
+	#####
+	
+	local tab=$(echo -en "\t\t")
+	cat <<- -EOF-
+
+	${PROGNAME} ver. ${VERSION}
+
+	The afewmore tool can be used to duplicate a given EC2 instance.  When
+     doing so, it creates multiple new instances and populates their data
+     directory by copying the data from the original.
+	
+	$(usage)
+	
+	OPTIONS
+     The source instance is specified via the mandatory argument to afewmore.
+     In addition, the following command-line options are supported:
+
+     -d dir   Copy the contents of this data directory from the orignal source
+	      instance to all the new instances.  If not specified, defaults
+	      to /data.
+
+     -h       Print a usage statement and exit.
+
+     -n num   Create this many new instances.  If not specified, defaults to
+	      10.
+
+     -v       Be verbose.
+
+	-EOF-
+}
+
+function run_instances
+{
+    aws ec2 run-instances --image-id $IID --count $num --query 'Instances[*].[InstanceId, PrivateIpAddress]' | awk 
+}
+###########################################################################
+#   Program starts here
+###########################################################################
+
+# Process command line arguments
+
+num=10
+dir=/data
+
+if [ "$1" = "--help" ]; then
+    helptext
+    exit
+fi
+
+# Display usage message if no options or arguments are given
+
+if [ "$1" = "" ]; then
+	usage
+	exit 1
+fi
+
+# Process possible option/argument combinations
+echo "start"
+echo $#
+
+while [ $# -ne 1 ]; do
+    case $1 in
+        -d )    shift
+                if [ ! -d $1 ]; then
+                    echo "$1 is not a directory!"
+                    exit 1
+                fi
+                dir=$1
+                ;;
+        -n )    shift
+                num=$1
+                ;;
+        -h )    usage
+                exit
+                ;;
+        * )     usage
+                exit 1
+    esac
+    echo $#
+    shift
+done
+
+instance=$1
+
+echo "Hello world!"
+echo $dir
+echo $num
+echo $instance
+
+# 1. get the instance type and the imgid
+aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,InstanceType,PrivateIpAddress,ImageId,SecurityGroups[*].GroupId]'
+aws ec2 describe-instances --instance-ids $instance --query 'Reservations[0].Instances[0].[InstanceType,PublicIpAddress,ImageId,SecurityGroups[*].GroupId]'
+
+# 2. create security groups with ssh allowed
+# 2. create instances and store the instance id and private IPs 
+# 3. login
+# 4. copy files using a for loop
+# 5. log out
+
+for (( i=0; i<$num; i++ ))
+do
+    echo $i
+done
