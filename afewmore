@@ -6,48 +6,48 @@ VERSION='0.0.1'
 
 function usage
 {
-	#####
-	#	Function to display usage message (does not exit)
-	#	No arguments
-	#####
+    #####
+    #   Function to display usage message (does not exit)
+    #   No arguments
+    #####
 
-	echo "Usage: ${PROGNAME} [-hv] [-d dir] [-n num] instance"
+    echo "Usage: ${PROGNAME} [-hv] [-d dir] [-n num] instance"
 }
 
 function helptext
 {
-	#####
-	#   Function to display help message for program
-	#   No arguments
-	#####
-	
-	local tab=$(echo -en "\t\t")
-	cat <<- -EOF-
+    #####
+    #   Function to display help message for program
+    #   No arguments
+    #####
+    
+    local tab=$(echo -en "\t\t")
+    cat <<- -EOF-
 
-	${PROGNAME} ver. ${VERSION}
+    ${PROGNAME} ver. ${VERSION}
 
-	The afewmore tool can be used to duplicate a given EC2 instance.  When
+    The afewmore tool can be used to duplicate a given EC2 instance.  When
      doing so, it creates multiple new instances and populates their data
      directory by copying the data from the original.
-	
-	$(usage)
-	
-	OPTIONS
+    
+    $(usage)
+    
+    OPTIONS
      The source instance is specified via the mandatory argument to afewmore.
      In addition, the following command-line options are supported:
 
      -d dir   Copy the contents of this data directory from the orignal source
-	      instance to all the new instances.  If not specified, defaults
-	      to /data.
+          instance to all the new instances.  If not specified, defaults
+          to /data.
 
      -h       Print a usage statement and exit.
 
      -n num   Create this many new instances.  If not specified, defaults to
-	      10.
+          10.
 
      -v       Be verbose.
 
-	-EOF-
+    -EOF-
 }
 
 function run_instances
@@ -60,7 +60,7 @@ function run_instances
 
 # Process command line arguments
 
-num=10
+num=2
 dir=/data
 
 if [ "$1" = "--help" ]; then
@@ -71,8 +71,8 @@ fi
 # Display usage message if no options or arguments are given
 
 if [ "$1" = "" ]; then
-	usage
-	exit 1
+    usage
+    exit 1
 fi
 
 # Process possible option/argument combinations
@@ -103,22 +103,49 @@ done
 
 instance=$1
 
-echo "Hello world!"
+echo "The arguments are as follows."
 echo $dir
 echo $num
 echo $instance
 
-# 1. get the instance type and the imgid
-aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,InstanceType,PrivateIpAddress,ImageId,SecurityGroups[*].GroupId]'
-aws ec2 describe-instances --instance-ids $instance --query 'Reservations[0].Instances[0].[InstanceType,PublicIpAddress,ImageId,SecurityGroups[*].GroupId]'
+echo "1. get the instance type and the imgid..."
+echo "InstanceType"
+InstanceType=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].InstanceType')
+echo $InstanceType
 
-# 2. create security groups with ssh allowed
-# 2. create instances and store the instance id and private IPs 
-# 3. login
-# 4. copy files using a for loop
+echo "PublicDnsName"
+PublicDnsName=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].PublicDnsName')
+echo $PublicDnsName
+
+echo "ImageId"
+ImageId=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].ImageId')
+echo $ImageId
+
+echo "GroupId"
+GroupId=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId')
+echo $GroupId
+
+echo "KeyName"
+KeyName=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].KeyName')
+echo $KeyName
+
+echo "2. create instances and store the instance id and private IPs..."
+# aws ec2 run-instances --image-id $ImageId --key-name $KeyName --security-group-ids $GroupId --instance-type $InstanceType --count $num --output text --query 'Instances[*].InstanceId'>tempInstances.txt
+
+# 3. scp pair keys to existing files? no need to :)
+#ssh -i ~/devenv-key.pem ec2-user@$PublicDnsName
+# 3. login the existing instance
+instances=$(cat tempInstances.txt)
+aws ec2 describe-instances --instance-ids $instances --output text --query 'Reservations[*].Instances[*].[InstanceId,PublicDnsName]' > tempInstances2.txt
+cat tempInstances2.txt | awk '{system("scp -i ~/devenv-key.pem -r ~/Desktop/hw6 ec2-user@"$2":$dir"); echo $1}'
+# 4. scp copy files using a for loop
+#scp -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
 # 5. log out
-
-for (( i=0; i<$num; i++ ))
-do
-    echo $i
-done
+# 5. output instance ids
+# 6. clear anything
+#echo "copy file to instanes..."
+#cat tempInstances.txt | awk '{system("scp -i ~/devenv-key.pem -r ~/Desktop/hw6 ec2-user@$2:$dir"); echo $1}'
+#for (( i=0; i<$num; i++ ))
+#do
+#    echo $i
+#done
