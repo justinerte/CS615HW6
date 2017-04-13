@@ -1,0 +1,144 @@
+#!/bin/bash
+# AFEWMORE script
+
+PROGNAME=$(basename $0)
+VERSION='0.0.3'
+
+function usage
+{
+  #####
+  # Function to display usage message (does not exit)
+  # No arguments
+  #####
+
+  echo "Usage: ${PROGNAME} [-hv] [-d dir] [-n num] instance"
+}
+
+function helptext
+{
+  #####
+  #   Function to display help message for program
+  #   No arguments
+  #####
+  
+  local tab=$(echo -en "\t\t")
+  cat <<- -EOF-
+
+  ${PROGNAME} ver. ${VERSION}
+
+  The afewmore tool can be used to duplicate a given EC2 instance.  When
+     doing so, it creates multiple new instances and populates their data
+     directory by copying the data from the original.
+  
+  $(usage)
+  
+  OPTIONS
+     The source instance is specified via the mandatory argument to afewmore.
+     In addition, the following command-line options are supported:
+
+     -d dir   Copy the contents of this data directory from the orignal source
+        instance to all the new instances.  If not specified, defaults
+        to /data.
+
+     -h       Print a usage statement and exit.
+
+     -n num   Create this many new instances.  If not specified, defaults to
+        10.
+
+     -v       Be verbose.
+
+  -EOF-
+}
+
+function run_instances
+{
+    aws ec2 run-instances --image-id $IID --count $num --query 'Instances[*].[InstanceId, PrivateIpAddress]' | awk 
+}
+
+###########################################################################
+#   Program starts here
+###########################################################################
+
+# Process command line arguments
+
+num=2
+dir=/data
+
+if [ "$1" = "--help" ]; then
+    helptext
+    exit
+fi
+
+# Display usage message if no options or arguments are given
+
+if [ "$1" = "" ]; then
+  usage
+  exit 1
+fi
+
+# Process possible option/argument combinations
+
+while [ $# -ne 1 ]; do
+    case $1 in
+        -d )    shift
+#                if [ ! -d $1 ]; then
+#                    echo "$1 is not a directory!"
+#                    exit 1
+#                fi
+                dir=$1
+                ;;
+        -n )    shift
+                num=$1
+                ;;
+        -h )    usage
+                exit
+                ;;
+        * )     usage
+                exit 1
+    esac
+    # echo $#
+    shift
+done
+
+instance=$1
+
+# echo "The arguments are as follows."
+# echo $dir
+# echo $num
+# echo $instance
+
+InstanceType=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].InstanceType')
+#echo "InstanceType "$InstanceType
+
+PublicDnsName=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].PublicDnsName')
+#echo "PublicDnsName "$PublicDnsName
+
+ImageId=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].ImageId')
+#echo "ImageId "$ImageId
+
+GroupId=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId')
+#echo "GroupId "$GroupId
+
+KeyName=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].KeyName')
+#echo "KeyName "$KeyName
+echo "Target instance info received."
+
+aws ec2 run-instances --image-id $ImageId --key-name $KeyName --security-group-ids $GroupId --instance-type $InstanceType --count $num --output text --query 'Instances[*].InstanceId'>tempInstances.txt
+echo "Instances created."
+
+scp -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
+echo "Data copied from target instance."
+
+echo "Trying to connect to the new instances..this will take less than one minute.."
+sleep 55
+instances=$(cat tempInstances.txt)
+aws ec2 describe-instances --instance-ids $instances --output text --query 'Reservations[*].Instances[*].[InstanceId,PublicDnsName]' > tempInstances2.txt
+cat tempInstances2.txt | awk '{system("scp -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir"); echo $1}'
+
+# cleaning temp files
+rm -r tempData
+rm tempInstances.txt
+rm tempInstances2.txt
+
+echo "Program finished."
+echo $?
