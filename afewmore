@@ -2,7 +2,7 @@
 # AFEWMORE script
 
 PROGNAME=$(basename $0)
-VERSION='0.0.3'
+VERSION='0.0.4'
 
 function usage
 {
@@ -50,10 +50,6 @@ function helptext
   -EOF-
 }
 
-function run_instances
-{
-    aws ec2 run-instances --image-id $IID --count $num --query 'Instances[*].[InstanceId, PrivateIpAddress]' | awk 
-}
 
 ###########################################################################
 #   Program starts here
@@ -126,19 +122,19 @@ echo "Target instance info received."
 aws ec2 run-instances --image-id $ImageId --key-name $KeyName --security-group-ids $GroupId --instance-type $InstanceType --count $num --output text --query 'Instances[*].InstanceId'>tempInstances.txt
 echo "Instances created."
 
-scp -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
+scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
 echo "Data copied from target instance."
 
 echo "Trying to connect to the new instances..this will take less than one minute.."
 sleep 55
 instances=$(cat tempInstances.txt)
 aws ec2 describe-instances --instance-ids $instances --output text --query 'Reservations[*].Instances[*].[InstanceId,PublicDnsName]' > tempInstances2.txt
-cat tempInstances2.txt | awk '{system("scp -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir"); echo $1}'
+cat tempInstances2.txt | awk '{system("scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir")}'
 
 # cleaning temp files
 rm -r tempData
-rm tempInstances.txt
-rm tempInstances2.txt
+#rm tempInstances.txt
+#rm tempInstances2.txt
 
 echo "Program finished."
 echo $?
