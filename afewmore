@@ -2,7 +2,7 @@
 # AFEWMORE script
 
 PROGNAME=$(basename $0)
-VERSION='0.0.3'
+VERSION='0.0.5'
 
 function usage
 {
@@ -50,10 +50,6 @@ function helptext
   -EOF-
 }
 
-function run_instances
-{
-    aws ec2 run-instances --image-id $IID --count $num --query 'Instances[*].[InstanceId, PrivateIpAddress]' | awk 
-}
 
 ###########################################################################
 #   Program starts here
@@ -77,7 +73,7 @@ if [ "$1" = "" ]; then
 fi
 
 # Process possible option/argument combinations
-
+verbose=0
 while [ $# -ne 1 ]; do
     case $1 in
         -d )    shift
@@ -92,6 +88,8 @@ while [ $# -ne 1 ]; do
                 ;;
         -h )    usage
                 exit
+                ;;
+        -v )    verbose=1
                 ;;
         * )     usage
                 exit 1
@@ -121,24 +119,43 @@ GroupId=$(aws ec2 describe-instances --instance-ids $instance --output text --qu
 
 KeyName=$(aws ec2 describe-instances --instance-ids $instance --output text --query 'Reservations[0].Instances[0].KeyName')
 #echo "KeyName "$KeyName
-echo "Target instance info received."
+if [ "$verbose" = "1" ]; then
+    echo "Target instance info received."
+fi
 
 aws ec2 run-instances --image-id $ImageId --key-name $KeyName --security-group-ids $GroupId --instance-type $InstanceType --count $num --output text --query 'Instances[*].InstanceId'>tempInstances.txt
-echo "Instances created."
+if [ "$verbose" = "1" ]; then
+    echo "Instances created."
+fi
 
-scp -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
-echo "Data copied from target instance."
+if [ "$verbose" = "1" ]; then
+    scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
+else
+    scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
+fi
 
-echo "Trying to connect to the new instances..this will take less than one minute.."
+if [ "$verbose" = "1" ]; then
+    echo "Data copied from target instance."
+    echo "Trying to connect to the new instances..this will take less than one minute.."
+fi
+
 sleep 55
 instances=$(cat tempInstances.txt)
 aws ec2 describe-instances --instance-ids $instances --output text --query 'Reservations[*].Instances[*].[InstanceId,PublicDnsName]' > tempInstances2.txt
-cat tempInstances2.txt | awk '{system("scp -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir"); echo $1}'
+if [ "$verbose" = "1" ]; then
+    cat tempInstances2.txt | awk '{system("scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir")}'
+else
+    cat tempInstances2.txt | awk '{system("scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir")}'
+fi
 
 # cleaning temp files
 rm -r tempData
-rm tempInstances.txt
-rm tempInstances2.txt
+#rm tempInstances.txt
+#rm tempInstances2.txt
+echo $instances | tr " " "\n"
 
-echo "Program finished."
-echo $?
+if [ "$verbose" = "1" ]; then
+    echo "Temp data cleared."
+    echo "Program finished."
+fi
+# echo $?
