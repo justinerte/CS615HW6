@@ -1,5 +1,6 @@
 #!/bin/bash
 # AFEWMORE script
+# 20:38 04/16
 
 PROGNAME=$(basename $0)
 VERSION='0.0.5'
