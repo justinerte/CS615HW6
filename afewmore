@@ -1,9 +1,9 @@
 #!/bin/bash
 # AFEWMORE script
-# 20:38 04/16
+# 14：00 04/17
 
 PROGNAME=$(basename $0)
-VERSION='0.0.6'
+VERSION='0.0.7'
 
 function usage
 {
@@ -31,7 +31,7 @@ function helptext
 
 # Process command line arguments
 
-num=2
+num=10
 dir=/data
 
 if [ "$1" = "--help" ]; then
@@ -114,9 +114,12 @@ fi
 echo $userName
 if [ "$verbose" = "1" ]; then
     scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
+    #scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
 else
     scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
+    #scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
 fi
+
 
 if [ "$verbose" = "1" ]; then
     echo "Data copied from target instance."
@@ -131,10 +134,12 @@ lines=$(cat tempInstances2.txt)
 if [ "$verbose" = "1" ]; then
     for line in $lines; do
         scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ $userName@$line:~
+        #scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ $userName@$line:~
     done
 else
     for line in $lines; do
         scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ $userName@$line:~
+        #scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ $userName@$line:~
     done
 fi
 
