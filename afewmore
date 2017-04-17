@@ -3,7 +3,7 @@
 # 20:38 04/16
 
 PROGNAME=$(basename $0)
-VERSION='0.0.5'
+VERSION='0.0.6'
 
 function usage
 {
@@ -21,34 +21,7 @@ function helptext
   #   Function to display help message for program
   #   No arguments
   #####
-  
-  local tab=$(echo -en "\t\t")
-  cat <<- -EOF-
-
-  ${PROGNAME} ver. ${VERSION}
-
-  The afewmore tool can be used to duplicate a given EC2 instance.  When
-     doing so, it creates multiple new instances and populates their data
-     directory by copying the data from the original.
-  
-  $(usage)
-  
-  OPTIONS
-     The source instance is specified via the mandatory argument to afewmore.
-     In addition, the following command-line options are supported:
-
-     -d dir   Copy the contents of this data directory from the orignal source
-        instance to all the new instances.  If not specified, defaults
-        to /data.
-
-     -h       Print a usage statement and exit.
-
-     -n num   Create this many new instances.  If not specified, defaults to
-        10.
-
-     -v       Be verbose.
-
-  -EOF-
+  cat afewmore.1.txt
 }
 
 
@@ -78,10 +51,6 @@ verbose=0
 while [ $# -ne 1 ]; do
     case $1 in
         -d )    shift
-#                if [ ! -d $1 ]; then
-#                    echo "$1 is not a directory!"
-#                    exit 1
-#                fi
                 dir=$1
                 ;;
         -n )    shift
@@ -124,15 +93,29 @@ if [ "$verbose" = "1" ]; then
     echo "Target instance info received."
 fi
 
+userName="root"
 aws ec2 run-instances --image-id $ImageId --key-name $KeyName --security-group-ids $GroupId --instance-type $InstanceType --count $num --output text --query 'Instances[*].InstanceId'>tempInstances.txt
 if [ "$verbose" = "1" ]; then
     echo "Instances created."
 fi
-
+if [ "$ImageId" = "ami-0b33d91d" ]; then
+    userName="ec2-user" #amazon linux
+elif [ "$ImageId" = "ami-0187f76b" ]; then
+    userName="fedora"   #fedora
+elif [ "$ImageId" = "ami-d0b520b8" ]; then
+    userName="ec2-user" #freebsd
+elif [ "$ImageId" = "ami-569ed93c" ]; then
+    userName="root"     #netbsd
+elif [ "$ImageId" = "ami-50ecc847" ]; then
+    userName="root"     #omnios
+elif [ "$ImageId" = "ami-6de0dd04" ]; then
+    userName="ubuntu"
+fi
+echo $userName
 if [ "$verbose" = "1" ]; then
-    scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
+    scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
 else
-    scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r ec2-user@$PublicDnsName:$dir tempData/
+    scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
 fi
 
 if [ "$verbose" = "1" ]; then
@@ -142,12 +125,19 @@ fi
 
 sleep 55
 instances=$(cat tempInstances.txt)
-aws ec2 describe-instances --instance-ids $instances --output text --query 'Reservations[*].Instances[*].[InstanceId,PublicDnsName]' > tempInstances2.txt
+aws ec2 describe-instances --instance-ids $instances --output text --query 'Reservations[*].Instances[*].PublicDnsName' > tempInstances2.txt
+
+lines=$(cat tempInstances2.txt)
 if [ "$verbose" = "1" ]; then
-    cat tempInstances2.txt | awk '{system("scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir")}'
+    for line in $lines; do
+        scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ $userName@$line:~
+    done
 else
-    cat tempInstances2.txt | awk '{system("scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ ec2-user@"$2":$dir")}'
+    for line in $lines; do
+        scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r tempData/ $userName@$line:~
+    done
 fi
+
 
 # cleaning temp files
 rm -r tempData
