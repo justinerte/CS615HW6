@@ -25,20 +25,6 @@ function helptext
   cat afewmore.1.txt
 }
 
-function getuserhelper
-{
- mes=`ssh -o "StrictHostKeyChecking no" root@$1 uname` 
- wordnum=$(echo $mes | awk '{print NF}')
- if [ $wordnum -gt "1" ]
- then
-  echo $mes | sed 's/[^"]*"\([^"]*\)".*/\1/'
-  userName = $mes
- else 
-  echo "root"
-#  userName = "root"
- fi
-}
-
 ###########################################################################
 #   Program starts here
 ###########################################################################
@@ -108,12 +94,25 @@ if [ "$verbose" = "1" ]; then
     echo "Target instance info received."
 fi
 
-getuserhelper
+
+
 
 #userName="root"
 aws ec2 run-instances --image-id $ImageId --key-name $KeyName --security-group-ids $GroupId --instance-type $InstanceType --count $num --output text --query 'Instances[*].InstanceId'>tempInstances.txt
 if [ "$verbose" = "1" ]; then
     echo "Instances created."
+fi
+
+sleep 10
+
+mes='ssh -o "StrictHostKeyChecking no" root@$PublicDnsName'
+wordnum=$(echo $mes | awk '{print NF}')
+if [ $wordnum -gt "1" ]; then
+   echo $mes | sed 's/[^"]*"\([^"]*\)".*/\1/'
+   userName = $mes
+else 
+   echo "root"
+#  userName = "root"
 fi
 #if [ "$ImageId" = "ami-0b33d91d" ]; then
 #    userName="ec2-user" #amazon linux
