@@ -1,9 +1,10 @@
 #!/bin/bash
 # AFEWMORE script
-# 14：00 04/17
+# 14:00 04/17
 
 PROGNAME=$(basename $0)
-VERSION='0.0.7'
+VERSION='0.0.8'
+userName ="root"
 
 function usage
 {
@@ -24,6 +25,19 @@ function helptext
   cat afewmore.1.txt
 }
 
+function getuserhelper
+{
+ mes=`ssh -o "StrictHostKeyChecking no" root@$1 uname` 
+ wordnum=$(echo $mes | awk '{print NF}')
+ if [ $wordnum -gt "1" ]
+ then
+  echo $mes | sed 's/[^"]*"\([^"]*\)".*/\1/'
+  userName = $mes
+ else 
+  echo "root"
+#  userName = "root"
+ fi
+}
 
 ###########################################################################
 #   Program starts here
@@ -31,8 +45,8 @@ function helptext
 
 # Process command line arguments
 
-num=10
-dir=/data
+num=10      #default num = 10
+dir=/data   #default dir =/data
 
 if [ "$1" = "--help" ]; then
     helptext
@@ -56,10 +70,10 @@ while [ $# -ne 1 ]; do
         -n )    shift
                 num=$1
                 ;;
-        -h )    usage
+        -h )    usage  #have not done
                 exit
                 ;;
-        -v )    verbose=1
+        -v )    verbose=1  #have not done
                 ;;
         * )     usage
                 exit 1
@@ -69,6 +83,7 @@ while [ $# -ne 1 ]; do
 done
 
 instance=$1
+echo instance
 
 # echo "The arguments are as follows."
 # echo $dir
@@ -93,24 +108,26 @@ if [ "$verbose" = "1" ]; then
     echo "Target instance info received."
 fi
 
-userName="root"
+getuserhelper
+
+#userName="root"
 aws ec2 run-instances --image-id $ImageId --key-name $KeyName --security-group-ids $GroupId --instance-type $InstanceType --count $num --output text --query 'Instances[*].InstanceId'>tempInstances.txt
 if [ "$verbose" = "1" ]; then
     echo "Instances created."
 fi
-if [ "$ImageId" = "ami-0b33d91d" ]; then
-    userName="ec2-user" #amazon linux
-elif [ "$ImageId" = "ami-0187f76b" ]; then
-    userName="fedora"   #fedora
-elif [ "$ImageId" = "ami-d0b520b8" ]; then
-    userName="ec2-user" #freebsd
-elif [ "$ImageId" = "ami-569ed93c" ]; then
-    userName="root"     #netbsd
-elif [ "$ImageId" = "ami-50ecc847" ]; then
-    userName="root"     #omnios
-elif [ "$ImageId" = "ami-6de0dd04" ]; then
-    userName="ubuntu"
-fi
+#if [ "$ImageId" = "ami-0b33d91d" ]; then
+#    userName="ec2-user" #amazon linux
+#elif [ "$ImageId" = "ami-0187f76b" ]; then
+#    userName="fedora"   #fedora
+#elif [ "$ImageId" = "ami-d0b520b8" ]; then
+#    userName="ec2-user" #freebsd
+#elif [ "$ImageId" = "ami-569ed93c" ]; then
+#    userName="root"     #netbsd
+#elif [ "$ImageId" = "ami-50ecc847" ]; then
+#    userName="root"     #omnios
+#elif [ "$ImageId" = "ami-6de0dd04" ]; then
+#    userName="ubuntu"
+#fi
 echo $userName
 if [ "$verbose" = "1" ]; then
     scp -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
@@ -119,7 +136,6 @@ else
     scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
     #scp -q -o StrictHostKeyChecking=no -i ~/devenv-key.pem -r $userName@$PublicDnsName:$dir tempData/
 fi
-
 
 if [ "$verbose" = "1" ]; then
     echo "Data copied from target instance."
